@@ -1,0 +1,6 @@
+{{#models}}{{#model}}{{^isArray}}{{>modelType}}
+
+
+{{>modelTypeBody}}
+{{/isArray}}{{#isArray}}CREATE OR REPLACE TYPE {{{name}}} FORCE AS TABLE OF {{{dataType}}} NOT PERSISTABLE;{{/isArray}}
+{{/model}}{{/models}}

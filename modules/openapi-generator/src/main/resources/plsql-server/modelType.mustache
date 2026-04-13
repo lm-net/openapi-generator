@@ -1,0 +1,26 @@
+CREATE OR REPLACE TYPE {{schema}}{{>modelName}} FORCE AS OBJECT (
+{{#vars}}
+    {{>propertyName}} {{^isPrimitiveType}}{{{doubleQuoteModels}}}{{/isPrimitiveType}}{{vendorExtensions.x-data-type-and-size}}{{^isPrimitiveType}}{{{doubleQuoteModels}}}{{/isPrimitiveType}},
+{{/vars}}
+
+    -- serializes object to JSON
+    MEMBER FUNCTION to_json
+        RETURN JSON_ELEMENT_T,
+
+    -- checks if at least one attribute is not null (including descendants)
+    MEMBER FUNCTION is_not_null
+        RETURN BOOLEAN,
+
+    -- validates if the object is consistent with the schema (e.g. all mandatory attributes are not null, all attributes are consistent with given enum, etc.) including descendants
+    MEMBER PROCEDURE validate,
+{{#hasRequired}}
+
+{{>modelEmptyConstructor}},
+{{/hasRequired}}
+
+{{>modelConstructor}},
+
+{{>modelJsonConstructor}}
+
+) FINAL NOT PERSISTABLE;
+/

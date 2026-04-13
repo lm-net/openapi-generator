@@ -1,0 +1,7 @@
+    -- constructor with parameters for all attributes (including inherited)
+    CONSTRUCTOR FUNCTION {{>modelName}} (
+    {{#allVars}}
+        {{>propertyName}} {{>propertyDataType}}{{^required}} DEFAULT {{#defaultValue}}{{#isString}}'{{/isString}}{{defaultValue}}{{#isString}}'{{/isString}}{{/defaultValue}}{{^defaultValue}}NULL{{/defaultValue}}{{/required}}{{^-last}},{{/-last}}
+    {{/allVars}}
+    )
+        RETURN SELF AS RESULT

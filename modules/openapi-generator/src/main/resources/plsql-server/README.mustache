@@ -1,0 +1,77 @@
+# PL/SQL Server Generator
+
+Generates Oracle PL/SQL object types (`TYPE … AS OBJECT`) and their nested-table
+collection variants (`TYPE … AS TABLE OF`) from OpenAPI model definitions.
+
+**Generator name:** `plsql-server`
+**Stability:** BETA
+**Requires:** Oracle Database 12c Release 2 (12.2) or newer (128-character identifiers)
+
+---
+
+## Generated files
+
+For each model defined in the OpenAPI specification one `.sql` file is produced
+containing:
+
+1. **Object type** – `CREATE OR REPLACE TYPE <MODEL>_T AS OBJECT (…)` with each
+   schema property mapped to an Oracle SQL data type.
+2. **Collection type** – `CREATE OR REPLACE TYPE <MODEL>_TAB_T AS TABLE OF <MODEL>_T`
+   so arrays of the model can be used directly as procedure parameters.
+
+---
+
+## OpenAPI → Oracle type mapping
+
+| OpenAPI type | OpenAPI format | Oracle type |
+|---|---|---|
+| `string` | _(none)_ | `VARCHAR2(4000)` |
+| `string` | `maxLength` set | `VARCHAR2(<maxLength>)` |
+| `string` | `date` | `DATE` |
+| `string` | `date-time` | `TIMESTAMP` |
+| `string` | `byte` / `binary` | `BLOB` |
+| `string` | `uuid` | `VARCHAR2(36)` |
+| `string` | `enum` | `VARCHAR2(4000)` — allowed values in inline comment |
+| `integer` | `int32` | `NUMBER(10)` |
+| `integer` | `int64` | `NUMBER(19)` |
+| `number` | `float` / `double` | `NUMBER` |
+| `boolean` | | `VARCHAR2(1)` — `Y` / `N` |
+| `array` | items is a model | `<ITEM_MODEL>_TAB_T` (nested-table reference) |
+| `array` | items is primitive | `CLOB` (JSON array) |
+| `object` / `$ref` | | `<MODEL>_T` (object type reference) |
+
+---
+
+## Configuration options
+
+| Option | Description | Default |
+|---|---|---|
+| `schemaName` | Oracle schema/owner prefix prepended to all type names (e.g. `MY_SCHEMA`). Leave empty to omit. | _(empty)_ |
+
+---
+
+## Usage example
+
+```bash
+openapi-generator generate \
+  -g plsql-server \
+  -i my-api.yaml \
+  -o output/plsql \
+  --additional-properties=schemaName=MY_SCHEMA
+```
+
+---
+
+## Notes
+
+* **Identifiers** are converted to `SNAKE_CASE` and upper-cased. Identifiers
+  longer than 128 characters are truncated with a warning.
+* **Boolean** fields are stored as `VARCHAR2(1)` using `Y` / `N` convention.
+  A future `validate_<MODEL>` function will enforce allowed values.
+* **Enum** fields use `VARCHAR2(4000)` with a `-- ENUM: val1, val2, …` comment.
+  Validation functions will be added in a future release.
+* **Type ordering** — the generator performs a topological sort so that object
+  types are always emitted after any types they reference.
+* **DROP statements** are included but commented out by default for safety.
+  Uncomment them before running destructive DDL.
+

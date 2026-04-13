@@ -140,6 +140,7 @@ The following generators are available:
 * [php-mezzio-ph](generators/php-mezzio-ph.md)  
 * [php-slim4](generators/php-slim4.md)  
 * [php-symfony](generators/php-symfony.md)  
+* [plsql-server (beta)](generators/plsql-server.md)  
 * [python-aiohttp](generators/python-aiohttp.md)  
 * [python-blueplanet](generators/python-blueplanet.md)  
 * [python-fastapi (beta)](generators/python-fastapi.md)  

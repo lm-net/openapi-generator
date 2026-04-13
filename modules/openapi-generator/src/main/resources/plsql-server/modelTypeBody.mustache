@@ -1,0 +1,135 @@
+CREATE OR REPLACE TYPE BODY {{schema}}{{>modelName}}
+AS
+    MEMBER FUNCTION to_json
+        RETURN JSON_ELEMENT_T
+    IS
+        obj JSON_OBJECT_T := JSON_OBJECT_T();
+        arr JSON_ARRAY_T;
+    BEGIN{{#allVars}}{{^required}}
+        IF self.{{>propertyName}} IS NOT NULL {{#isModel}}AND self.{{>propertyName}}.is_not_null {{/isModel}}{{#isArray}}AND self.{{>propertyName}}.COUNT > 0 {{/isArray}}THEN{{/required}}{{#isModel}}
+        {{^required}}    {{/required}}obj.put('{{name}}', self.{{>propertyName}}.to_json);{{/isModel}}{{#isArray}}
+            arr := JSON_ARRAY_T();
+
+            FOR i IN self.{{>propertyName}}.FIRST .. self.{{>propertyName}}.LAST LOOP
+                arr.append(self.{{>propertyName}}(i));
+            END LOOP;
+
+            obj.put('{{name}}', arr);{{/isArray}}{{#isPrimitiveType}}{{^isDate}}{{^isDateTime}}
+        {{^required}}    {{/required}}obj.put('{{name}}', self.{{>propertyName}});{{/isDateTime}}{{/isDate}}{{/isPrimitiveType}}{{#isDateTime}}
+        {{^required}}    {{/required}}obj.put('{{name}}', REPLACE(TO_CHAR(FROM_TZ(self.{{>propertyName}}, '{{defaultTimeZone}}'), 'YYYY-MM-DD"T"HH24:MI:SS.FF6TZH:TZM'), '.000000'));{{/isDateTime}}{{#isDate}}
+        {{^required}}    {{/required}}obj.put('{{name}}', TO_CHAR(self.{{>propertyName}}, 'YYYY-MM-DD'));{{/isDate}}{{^required}}
+        END IF;{{/required}}
+    {{/allVars}}
+
+        RETURN obj;
+    END to_json;
+
+    MEMBER FUNCTION is_not_null
+        RETURN BOOLEAN
+    IS
+    BEGIN
+    {{#allVars}}
+        IF self.{{>propertyName}} IS NOT NULL{{#isModel}} AND self.{{>propertyName}}.is_not_null{{/isModel}}{{#isArray}} AND self.{{>propertyName}}.COUNT > 0{{/isArray}} THEN
+            RETURN TRUE;
+        END IF;
+
+    {{/allVars}}
+        RETURN FALSE;
+    END is_not_null;
+
+    MEMBER PROCEDURE validate
+    IS
+    BEGIN{{#allVars}}{{#required}}
+        IF self.{{>propertyName}} IS NULL THEN
+            RAISE_APPLICATION_ERROR({{validationErrorCode}}, 'Mandatory attribute {{name}} is NULL');
+        END IF;
+    {{/required}}{{#isEnum}}
+        IF self.{{>propertyName}} IS NOT NULL AND self.{{>propertyName}} NOT IN ({{#allowableValues}}{{#values}}'{{.}}'{{^-last}}, {{/-last}}{{/values}}{{/allowableValues}}) THEN
+            RAISE_APPLICATION_ERROR({{validationErrorCode}}, 'Attribute {{name}} is not consistent with given enum');
+        END IF;
+    {{/isEnum}}{{#isModel}}
+        IF self.{{>propertyName}} IS NOT NULL THEN
+            self.{{>propertyName}}.validate();
+        END IF;
+    {{/isModel}}{{#isArray}}
+        IF self.{{>propertyName}} IS NOT NULL AND self.{{>propertyName}}.COUNT > 0 THEN
+            FOR i IN self.{{>propertyName}}.FIRST .. self.{{>propertyName}}.LAST LOOP
+                {{#items}}{{#isModel}}self.{{>propertyName}}(i).validate();{{/isModel}}{{^isModel}}NULL;{{/isModel}}{{/items}}
+            END LOOP;
+        END IF;
+    {{/isArray}}{{/allVars}}
+        NULL;
+    END validate;
+
+{{#hasRequired}}
+{{>modelEmptyConstructor}}
+
+    IS
+    BEGIN{{#allVars}}{{^isPrimitiveType}}
+        self.{{>propertyName}} := {{>propertyDataType}}();{{/isPrimitiveType}}{{/allVars}}
+
+        RETURN;
+    END {{>modelName}};
+{{/hasRequired}}
+
+{{>modelConstructor}}
+
+    IS
+    BEGIN{{#allVars}}{{#isModel}}
+        IF {{>propertyName}} IS NOT NULL AND {{>propertyName}}.is_not_null THEN
+            self.{{>propertyName}} := {{>propertyName}};
+        ELSE
+            self.{{>propertyName}} := {{>propertyDataType}}();
+        END IF;
+{{/isModel}}{{#isArray}}
+        IF {{>propertyName}} IS NOT NULL AND {{>propertyName}}.COUNT > 0 THEN
+            self.{{>propertyName}} := {{>propertyName}};
+        ELSE
+            self.{{>propertyName}} := {{>propertyDataType}}();
+        END IF;
+{{/isArray}}{{#isPrimitiveType}}
+        self.{{>propertyName}} := {{>propertyName}};
+{{/isPrimitiveType}}{{/allVars}}
+        RETURN;
+    END {{>modelName}};
+
+{{>modelJsonConstructor}}
+
+    IS
+        arr JSON_ARRAY_T;
+    BEGIN{{#allVars}}{{#isNumeric}}
+        self.{{>propertyName}} := json_i.get_number('{{name}}');{{/isNumeric}}{{#isDate}}
+        self.{{>propertyName}} := json_i.get_date('{{name}}');{{/isDate}}{{#isDateTime}}
+        self.{{>propertyName}} := FROM_TZ(json_i.get_timestamp('{{name}}'), 'UTC') AT TIME ZONE '{{defaultTimeZone}}';{{/isDateTime}}{{#isBoolean}}
+        self.{{>propertyName}} := json_i.get_boolean('{{name}}');{{/isBoolean}}{{^isBoolean}}{{#isString}}
+        self.{{>propertyName}} := json_i.get_string('{{name}}');{{/isString}}{{/isBoolean}}{{#vendorExtensions.x-is-clob}}
+        self.{{>propertyName}} := json_i.get_clob('{{name}}');{{/vendorExtensions.x-is-clob}}{{#vendorExtensions.x-is-json}}
+        self.{{>propertyName}} := json_i.get_object('{{name}}');{{/vendorExtensions.x-is-json}}{{^isPrimitiveType}}{{^isArray}}
+
+        IF json_i.get_object('{{name}}') IS NOT NULL THEN
+            self.{{>propertyName}} := {{>propertyDataType}}(json_i.get_object('{{name}}'));
+        END IF;{{/isArray}}{{#isArray}}
+
+        arr := json_i.get_array('{{name}}');
+        self.{{>propertyName}} := {{>propertyDataType}}();
+        IF arr IS NOT NULL AND arr.get_size > 0 THEN
+            FOR i IN 0 .. arr.get_size - 1 LOOP
+                self.{{>propertyName}}.EXTEND;{{#items}}{{#isPrimitiveType}}{{#isNumeric}}
+                self.{{>propertyName}}(self.{{>propertyName}}.LAST) := arr.get_number(i);{{/isNumeric}}{{#isDate}}
+                self.{{>propertyName}}(self.{{>propertyName}}.LAST) := arr.get_date(i);{{/isDate}}{{#isDateTime}}
+                self.{{>propertyName}}(self.{{>propertyName}}.LAST) := FROM_TZ(arr.get_timestamp(i), 'UTC') AT TIME ZONE '{{defaultTimeZone}}';{{/isDateTime}}{{#isBoolean}}
+                self.{{>propertyName}}(self.{{>propertyName}}.LAST) := arr.get_boolean(i);{{/isBoolean}}{{^isBoolean}}{{#isString}}
+                self.{{>propertyName}}(self.{{>propertyName}}.LAST) := arr.get_string(i);{{/isString}}{{/isBoolean}}{{#vendorExtensions.x-is-clob}}
+                self.{{>propertyName}}(self.{{>propertyName}}.LAST) := arr.get_clob(i);{{/vendorExtensions.x-is-clob}}{{#vendorExtensions.x-is-json}}
+                self.{{>propertyName}}(self.{{>propertyName}}.LAST) := arr.get_object(i);{{/vendorExtensions.x-is-json}}{{/isPrimitiveType}}{{^isPrimitiveType}}
+                IF arr.get(i) IS NOT NULL THEN
+                    self.{{>propertyName}}(self.{{>propertyName}}.LAST) := {{>propertyDataType}}(TREAT(arr.get(i) AS JSON_OBJECT_T));
+                END IF;{{/isPrimitiveType}}{{/items}}
+            END LOOP;
+        END IF;
+    {{/isArray}}{{/isPrimitiveType}}{{/allVars}}
+
+        RETURN;
+    END {{>modelName}};
+END {{>modelName}};
+/

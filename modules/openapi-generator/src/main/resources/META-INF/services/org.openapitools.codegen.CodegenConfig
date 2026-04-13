@@ -109,6 +109,7 @@ org.openapitools.codegen.languages.PhpSymfonyServerCodegen
 org.openapitools.codegen.languages.PhpMezzioPathHandlerServerCodegen
 org.openapitools.codegen.languages.PhpDataTransferClientCodegen
 org.openapitools.codegen.languages.PhpLaravelServerCodegen
+org.openapitools.codegen.languages.PlSqlServerCodegen
 org.openapitools.codegen.languages.PostgresqlSchemaCodegen
 org.openapitools.codegen.languages.PostmanCollectionCodegen
 org.openapitools.codegen.languages.PowerShellClientCodegen
